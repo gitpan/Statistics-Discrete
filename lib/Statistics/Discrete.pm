@@ -28,9 +28,10 @@ use 5.014002;
 use strict;
 use warnings;
 use List::Util;
-use Math::Round;
+use POSIX;
 
-our $VERSION = '0.01';
+
+our $VERSION = '0.02';
 
 use constant NO_BINNING   => 0;
 use constant LIN_BINNING  => 1;
@@ -58,6 +59,8 @@ sub new {
   bless $self, $class;
   return $self;
 }
+
+################## Methods to load/add data  ##################
 
 sub add_data {
   my $self = shift;
@@ -169,7 +172,77 @@ sub mean {
 }
 
 
+
+# http://en.wikipedia.org/wiki/Median
+# the median is the numerical value separating
+# the higher half of a data sample, a population,
+# or a probability distribution, from the lower half. 
+sub median {
+  my $self = shift;
+  if(!defined($self->{"stats"}{"Desc"}{"median"})) {
+    my $count = $self->count();
+    my $median_index = floor($count/2);
+    my $even = 0;
+    if($count % 2 == 0) {
+      $even = 1;
+    }
+    my $v;
+    my $cumul_count = 0;
+    my $previous_val = 0;
+    foreach $v(sort {$a<=>$b} @{$self->{"data"}}) {
+      
+      if($cumul_count == $median_index and 
+	 $even == 0) {
+	$self->{"stats"}{"Desc"}{"median"} = $v;
+	last;
+      }
+      if($cumul_count == $median_index and 
+	 $even == 1) {
+	#If there is an even number of observations,
+	# then there is no single middle value; the median
+	# is then usually defined to be the mean of the two middle values
+	$self->{"stats"}{"Desc"}{"median"} = ($previous_val + $v)/2;
+	last;
+      }
+      $cumul_count++;
+      $previous_val = $v;
+    }
+  }
+  return $self->{"stats"}{"Desc"}{"median"};
+}
+
+
+# http://en.wikipedia.org/wiki/Percentile
+# A percentile (or a centile) is a measure
+# used in statistics indicating the value 
+# below which a given percentage of observations
+# in a group of observations fall.
+sub percentile {
+  my $self = shift;
+  my $perc = shift;
+  my $max_probability = $perc/100;
+  my $cdf = $self->empirical_distribution_function();
+  my $v = 0;
+  my $previous_v = 0;
+  my $epsilon = 0;
+  foreach $v(sort {$a<=>$b} keys %{$cdf}) {
+    $epsilon = $v - $previous_v;
+    if($cdf->{$v} > $max_probability) {
+      return $v;
+    }
+    $previous_v = $v;
+  }
+  # if the program is here then $perc == 1
+  # then we return $v+epsilon
+  return $v+$epsilon;
+}
+
+
+
 # http://en.wikipedia.org/wiki/Variance
+# The variance of a random variable X is
+# its second central moment, the expected 
+# value of the squared deviation from the mean
 sub variance {
   my $self = shift;
   if(!defined($self->{"stats"}{"Desc"}{"variance"})) {
@@ -191,6 +264,8 @@ sub variance {
 
 
 # http://en.wikipedia.org/wiki/Standard_deviation
+# The standard deviation of a random variable
+# is the square root of its variance.
 sub standard_deviation {
   my $self = shift;
   if(!defined($self->{"stats"}{"Desc"}{"sdev"})) { 
@@ -568,6 +643,9 @@ sub _optimal_binning {
   my $min_num_bins = 2;
   my ($b_min, $f_min, $d_min, $s_min) = $self->_bin_attempt($min_num_bins);
   my $max_num_bins = scalar $self->_full_support();
+  if($max_num_bins == 1) {
+    return -1;
+  }
   my ($b_max, $f_max, $d_max, $s_max) = $self->_bin_attempt($max_num_bins);
   # initial check
   if( $s_min > 1 or $s_max < 1) { 
@@ -576,7 +654,7 @@ sub _optimal_binning {
   my $avg_num_bins;
   my ($b_avg, $f_avg, $d_avg, $s_avg);
   while( ($max_num_bins - $min_num_bins) > 1) {
-    $avg_num_bins = Math::Round::round(($max_num_bins + $min_num_bins)/2);
+    $avg_num_bins = sprintf("%.f", (($max_num_bins + $min_num_bins)/2));
     ($b_avg, $f_avg, $d_avg, $s_avg) = $self->_bin_attempt($avg_num_bins);
     if($s_avg < 1) {
       $min_num_bins = $avg_num_bins;
@@ -734,120 +812,4 @@ sub compute_log_bins {
 }
 
 
-
 1;
-__END__
-# Below is stub documentation for your module. You'd better edit it!
-
-=head1 NAME
-
-Statistics::Discrete - Perl extension for blah blah blah
-
-=head1 SYNOPSIS
-
-  use Statistics::Discrete;
- 
-  # construct a new class
-  my $sd = Statistics::Discrete->new();
-  
-  # add data using an array
-  $sd->add_data((2,5,7,2,1,7,3,3,7,333));
-  
-  # ---- Descriptive Statistics ---- #
-
-  # Count the number of samples
-  my $count = $sd->count(); 
-  # Minimum data value
-  my $min = $sd->minimum(); 
-  # Maximum data value
-  my $max = $sd->maximum(); 
-  # Mean 
-  my $mean = $sd->mean(); 
-  # Variance
-  my $variance = $sd->variance(); 
-  # Standard Deviation
-  my $standard_deviation = $sd->standard_deviation(); 
-
-
-  # ---- Distributions ---- #
-
-  my $fd = $sd->frequency_distribution();
-  my $pmf = $sd->probability_mass_function();
-  my $cdf = $sd->empirical_distribution_function();
-  my $ccdf = $sd->complementary_cumulative_distribution_function();
-
-
-  # ---- Binning ---- #
-  # binning influences the way the distributions
-  # are returned
-  my $binning_type = NO_BINNING;   # DEFAULT
-  $binning_type = LIN_BINNING; 
-  $binning_type = LOG_BINNING; 
-  $sd->set_binning_type($binning_type);
-
-  $sd->set_optimal_binning();
-  my $num_of_bins = 3;
-  $sd->set_custom_num_bins($num_of_bins);
-  
-  # return the bins currently used
-  my $cur_bins = $sd->bins();
-
-  # compute linear bins starting from the data
-  my $lin_bins = $sd->compute_lin_bins($num_of_bins);
-  my $log_bins = $sd->compute_log_bins($num_of_bins);
-
-  # ---- Data Input ---- #
-
-  # add data from file
-  $sd->add_data_from_file("./data.txt"); 
-
-
-=head1 DESCRIPTION
-
-Stub documentation for Statistics::Discrete, created by h2xs. 
-
-TODO: work in progress
-
-=head2 EXPORT
-
-None by default.
-
-
-
-=head1 SEE ALSO
-
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
-
-=head1 AUTHOR
-
-Chiara Orsini, E<lt>chiara@caida.orgE<gt>
-
-=head1 COPYRIGHT AND LICENSE
-
-Chiara Orsini, CAIDA, UC San Diego
-chiara@caida.org
-
-Copyright (C) 2014 The Regents of the University of California.
-
-Statistics::Discrete is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-Statistics::Discrete is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Statistics::Discrete.  If not, see <http://www.gnu.org/licenses/>.
-
-
-=cut

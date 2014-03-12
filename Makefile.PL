@@ -29,8 +29,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME              => 'Statistics::Discrete',
     VERSION_FROM      => 'lib/Statistics/Discrete.pm', # finds $VERSION
-    PREREQ_PM         => { Math::Round => 0.6,
-			   List::Util => 1.38}, # e.g., Module::Name => 1.1
+    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Statistics/Discrete.pm', # retrieve abstract from module
        AUTHOR         => 'Chiara Orsini <chiara@caida.org>') : ()),

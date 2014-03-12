@@ -4,3 +4,4 @@ MANIFEST
 README
 t/Statistics-Discrete.t
 lib/Statistics/Discrete.pm
+lib/Statistics/Discrete.pod
