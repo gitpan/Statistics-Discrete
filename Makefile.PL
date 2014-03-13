@@ -28,9 +28,9 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     NAME              => 'Statistics::Discrete',
-    VERSION_FROM      => 'lib/Statistics/Discrete.pm', # finds $VERSION
-    PREREQ_PM         => {}, # e.g., Module::Name => 1.1
+    VERSION_FROM      => 'lib/Statistics/Discrete.pm', 
+    PREREQ_PM         => { 'List::Util' => 1.25}, 
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
-      (ABSTRACT_FROM  => 'lib/Statistics/Discrete.pm', # retrieve abstract from module
+      (ABSTRACT  => 'Perl extension for statistical analyses of discrete data',
        AUTHOR         => 'Chiara Orsini <chiara@caida.org>') : ()),
 );

@@ -5,3 +5,5 @@ README
 t/Statistics-Discrete.t
 lib/Statistics/Discrete.pm
 lib/Statistics/Discrete.pod
+META.yml                                 Module YAML meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)
