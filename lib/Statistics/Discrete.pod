@@ -90,6 +90,7 @@ or:
 
 =head2  Descriptive Statistics
 
+=over 4
 
 =item count()
 
@@ -123,11 +124,16 @@ C<standard_deviation> return the standard deviation.
 
 C<percentile> return the minimum data value that satisfies the C<$perc> percentile.
 
+=back
+
+
 =head2  Distributions
 
 The distributions are computed without any binning of the data provided
 unless a binning type is explicitely provided (see section
 "Advanced Features: binning").
+
+=over 4
 
 =item frequency_distribution()
 
@@ -157,7 +163,7 @@ with that data point as the corresponding hash value (i.e. probability to extrac
 a value greater than the one in the key, among the data set provided).
 Alias Empirical CCDF.
 
-
+=back
 
 =head2 Advanced Features: binning
 
@@ -179,6 +185,7 @@ When binning is applied to the other distributions, the returning hash represent
 a density function other than a probability distribution. In fact, the probabilities
 associated with each bin are divided by the width of bin.
 
+=over 4
 
 =item set_binning_type( [$binning_type] )
 
@@ -206,8 +213,11 @@ bins using the above function.
 
 If the C<logarithmic binning is set>, the user can decide to switch to the optimal binning, i.e. the number of bins is automatically computed by the class.
 
+=back
 
 =head2 Additional features
+
+=over 4
 
 =item bins()
 
@@ -223,6 +233,8 @@ C<compute_lin_bins()> returns the linear bins computed on the current data set (
 =item compute_log_bins( [$num_bins] )
 
 C<compute_log_bins()> returns the logarithimic bins computed on the current data set (the number of bins is provided). This does not mean the program is using this binning. The binning has to be set using the functions described in the previous section.
+
+=back
 
 
 =head2 EXPORT

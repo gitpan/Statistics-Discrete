@@ -31,12 +31,33 @@
 use strict;
 use warnings;
 
-use Test::More tests => 1;
+use Test::More;
+eval "use Test::Pod 1.00";
+
 BEGIN { use_ok('Statistics::Discrete') };
+
 
 #########################
 
 # Insert your test code below, the Test::More module is use()ed here so read
 # its man page ( perldoc Test::More ) for help writing this test script.
 
-#TODO
+#plan skip_all => "Test::Pod 1.00 required for testing POD" if $@;
+#all_pod_files_ok();
+
+#  ok($got eq $expected, $test_name);
+
+my $s = Statistics::Discrete->new();
+ok(defined($s), "Statistics::Discrete new()");
+
+$s->add_data((2,5,7,2,1,7,3,3,7,333));
+ok($s->count() == 10, "Statistics::Discrete->count()");
+ok($s->mean() == 37, "Statistics::Discrete->mean()");
+ok($s->minimum() == 1, "Statistics::Discrete->minimum()");
+ok($s->maximum() == 333, "Statistics::Discrete->maximum()");
+ok($s->median() == 4, "Statistics::Discrete->median()");
+ok(sprintf("%.1f",$s->variance()) eq "9739.8", "Statistics::Discrete->variance()");
+
+my $number_of_tests_run = 8;
+done_testing( $number_of_tests_run );
+

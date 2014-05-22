@@ -29,9 +29,11 @@ use strict;
 use warnings;
 use List::Util;
 use POSIX;
+use Storable 'dclone';
 
 
-our $VERSION = '0.02';
+
+our $VERSION = '0.03';
 
 use constant NO_BINNING   => 0;
 use constant LIN_BINNING  => 1;
@@ -45,7 +47,7 @@ use constant DEFAULT_BINS_NUMBER => 10;
 sub new {  
   my $class = shift;
   my $self = {};
-  $self->{"data"} = []; # anonymous array constructor
+  $self->{"data_frequency"} = {}; # anonymous hash constructor
   # binning default values
   $self->{"bin-type"} = NO_BINNING;
   $self->{"optimal-binning"} = 1;
@@ -65,7 +67,15 @@ sub new {
 sub add_data {
   my $self = shift;
   my @data_to_add = @_;
-  push(@{$self->{"data"}}, @data_to_add);
+  my $data;
+  foreach $data(@data_to_add) {
+    if(defined($self->{"data_frequency"}{$data})) {
+      $self->{"data_frequency"}{$data}++;
+    }
+    else {
+      $self->{"data_frequency"}{$data} = 1 ;
+    }
+  }
   # data has changed - stats and bins need to be computed again
   delete $self->{"stats"};
   delete $self->{"bins"};
@@ -86,12 +96,29 @@ sub add_data_from_file {
     }
     @cols = split /\s/ , $line;
     if(scalar @cols == 1) {   # assume list of values
-      push(@{$self->{"data"}}, $cols[0]);
+      if(defined($self->{"data_frequency"}{$cols[0]})) {
+	$self->{"data_frequency"}{$cols[0]}++;
+      }
+      else {
+	$self->{"data_frequency"}{$cols[0]} = 1 ;
+      }
     }
     if(scalar @cols == 2) {   # assume list of id - value pairs
-      push(@{$self->{"data"}}, $cols[1]);
+      if(defined($self->{"data_frequency"}{$cols[1]})) {
+	$self->{"data_frequency"}{$cols[1]}++;
+      }
+      else {
+	$self->{"data_frequency"}{$cols[1]} = 1 ;
+      }
     }
-    # TODO manage other cases
+    # File format not recognized
+    if(scalar @cols != 1 and scalar @cols == 2){
+      print "File format not recognized\n";
+      close($f);
+      delete $self->{"stats"};
+      delete $self->{"bins"};
+      return;      
+    }
   }
   close($f);
   # data has changed - stats and bins need to be computed again
@@ -111,7 +138,7 @@ sub minimum {
   if(!defined($self->{"stats"}{"Desc"}{"min"})) {
     my $count = $self->count();
     if($count > 0) {
-      $self->{"stats"}{"Desc"}{"min"} = List::Util::min(@{$self->{"data"}});
+      $self->{"stats"}{"Desc"}{"min"} = List::Util::min(keys $self->{"data_frequency"});
     }
     else {
       $self->{"stats"}{"Desc"}{"min"} = 0;
@@ -128,7 +155,7 @@ sub maximum {
   if(!defined($self->{"stats"}{"Desc"}{"max"})) {
     my $count = $self->count();
     if($count > 0) {
-      $self->{"stats"}{"Desc"}{"max"} = List::Util::max(@{$self->{"data"}});
+      $self->{"stats"}{"Desc"}{"max"} = List::Util::max(keys $self->{"data_frequency"});
     }
     else {
       $self->{"stats"}{"Desc"}{"max"} = 0;
@@ -143,7 +170,12 @@ sub maximum {
 sub count {
   my $self = shift;
   if(!defined($self->{"stats"}{"Desc"}{"count"})) {
-    $self->{"stats"}{"Desc"}{"count"} = scalar @{$self->{"data"}};
+    my $count = 0;
+    my $data;
+    foreach $data(keys $self->{"data_frequency"}) {
+      $count += $self->{"data_frequency"}{$data};
+    }
+    $self->{"stats"}{"Desc"}{"count"} = $count;
   }
   return $self->{"stats"}{"Desc"}{"count"};
 }
@@ -158,8 +190,8 @@ sub mean {
     my $cumul_value = 0;
     my $count = $self->count();
     my $v;
-    foreach $v(@{$self->{"data"}}) {
-      $cumul_value += $v;
+    foreach $v( keys $self->{"data_frequency"}) {
+      $cumul_value += $v * $self->{"data_frequency"}{$v};
     }
     if($count > 0) {
       $self->{"stats"}{"Desc"}{"mean"} = $cumul_value / $count;
@@ -181,31 +213,26 @@ sub median {
   my $self = shift;
   if(!defined($self->{"stats"}{"Desc"}{"median"})) {
     my $count = $self->count();
-    my $median_index = floor($count/2);
-    my $even = 0;
-    if($count % 2 == 0) {
-      $even = 1;
+    my $odd = 0;
+    if($count % 2 != 0) {
+      $odd = 1;
     }
-    my $v;
-    my $cumul_count = 0;
-    my $previous_val = 0;
-    foreach $v(sort {$a<=>$b} @{$self->{"data"}}) {
-      
-      if($cumul_count == $median_index and 
-	 $even == 0) {
-	$self->{"stats"}{"Desc"}{"median"} = $v;
-	last;
+    my $median_index = floor($count/2) + $odd;
+    my $current_index = 0;
+
+    my ($v,$i);
+    foreach $v(sort {$a<=>$b} keys $self->{"data_frequency"}) {
+      for($i=0; $i < $self->{"data_frequency"}{$v}; $i++) {
+	$current_index++;
+	if($current_index == $median_index) {
+	  $self->{"stats"}{"Desc"}{"median"} = $v;
+	}
+	if($current_index == ($median_index+1) and
+	  $odd == 0) {
+	  $self->{"stats"}{"Desc"}{"median"} = ($self->{"stats"}{"Desc"}{"median"} + $v)/2;
+	}
+
       }
-      if($cumul_count == $median_index and 
-	 $even == 1) {
-	#If there is an even number of observations,
-	# then there is no single middle value; the median
-	# is then usually defined to be the mean of the two middle values
-	$self->{"stats"}{"Desc"}{"median"} = ($previous_val + $v)/2;
-	last;
-      }
-      $cumul_count++;
-      $previous_val = $v;
     }
   }
   return $self->{"stats"}{"Desc"}{"median"};
@@ -251,8 +278,8 @@ sub variance {
     my $cumul_value = 0;    
     my $square_mean = 0;
     my $v;
-    foreach $v(@{$self->{"data"}}) {
-      $cumul_value += $v**2;
+    foreach $v(keys $self->{"data_frequency"}) {
+      $cumul_value += ($v**2) * $self->{"data_frequency"}{$v};
     }
     if($count > 0) {
       $square_mean = $cumul_value / $count;
@@ -353,16 +380,7 @@ sub complementary_cumulative_distribution_function  {
 sub _frequency_distribution {
   my $self = shift;
   if(!defined($self->{"stats"}{"Dist"}{"frequency"})) {     
-    $self->{"stats"}{"Dist"}{"frequency"} = {};
-    my $v;
-    foreach $v(@{$self->{"data"}}) {
-      if(!defined($self->{"stats"}{"Dist"}{"frequency"}->{$v})) {
-	$self->{"stats"}{"Dist"}{"frequency"}->{$v} = 1;
-      }
-      else {
-	$self->{"stats"}{"Dist"}{"frequency"}->{$v}++;
-      }
-    }
+    $self->{"stats"}{"Dist"}{"frequency"} = dclone $self->{"data_frequency"};
   }
   return $self->{"stats"}{"Dist"}{"frequency"};
 }
@@ -582,7 +600,7 @@ sub bins {
     if( $self->{"bin-type"} == NO_BINNING) {
       my $curbins = {};
       my $v;
-      foreach $v(@{$self->{"data"}}) {
+      foreach $v(keys $self->{"data_frequency"}) {
 	my $ref = $v;
 	$curbins->{$v}{"left"} = $v;
 	$curbins->{$v}{"right"} = $v;
@@ -610,7 +628,7 @@ sub bins {
 	print "using the NO_BINNING mode" . "\n";
 	my $curbins = {};
 	my $v;
-	foreach $v(@{$self->{"data"}}) {
+	foreach $v(keys $self->{"data_frequency"}) {
 	  my $ref = $v;
 	  $curbins->{$v}{"left"} = $v;
 	  $curbins->{$v}{"right"} = $v;
@@ -755,7 +773,7 @@ sub _full_support {
   my $self = shift;
   my $support = {};
   my $v;
-  foreach $v(@{$self->{"data"}}) {
+  foreach $v( keys $self->{"data_frequency"}) {
     $support->{$v} = 1;
   }
   return (keys %{$support});
