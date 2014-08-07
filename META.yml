@@ -20,4 +20,4 @@ no_index:
 requires:
   List::Util: 1.25
   Storable: 2.45
-version: 0.03
+version: 0.04

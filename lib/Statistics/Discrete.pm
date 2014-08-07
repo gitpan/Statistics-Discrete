@@ -33,7 +33,7 @@ use Storable 'dclone';
 
 
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use constant NO_BINNING   => 0;
 use constant LIN_BINNING  => 1;
@@ -112,7 +112,7 @@ sub add_data_from_file {
       }
     }
     # File format not recognized
-    if(scalar @cols != 1 and scalar @cols == 2){
+    if(scalar @cols != 1 and scalar @cols != 2){
       print "File format not recognized\n";
       close($f);
       delete $self->{"stats"};
